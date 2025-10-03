@@ -1,11 +1,16 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import os
 
-# Load trained Random Forest model
+# Load trained Random Forest model safely
 @st.cache_resource
 def load_model():
-    return joblib.load("RandomForest_model.pkl")
+    model_path = "RandomForest_model.pkl"
+    if not os.path.exists(model_path):
+        st.error(f"❌ Model file not found: {model_path}. Please ensure it is uploaded.")
+        st.stop()
+    return joblib.load(model_path)
 
 model = load_model()
 
@@ -13,7 +18,7 @@ model = load_model()
 st.set_page_config(page_title="Diabetes Prediction", layout="centered")
 st.title("🌿 Diabetes Prediction App (Random Forest)")
 
-st.write("This app uses a Random Forest model you trained to predict diabetes based on patient details.")
+st.write("This app uses your trained Random Forest model to predict diabetes based on patient details.")
 
 # Input form - Updated to match training data features
 col1, col2, col3 = st.columns(3)
@@ -32,9 +37,7 @@ with col3:
     systolic_bp = st.number_input("SYSTOLIC BP", min_value=0, max_value=300, value=120)
     diastolic_bp = st.number_input("DIASTOLIC BP", min_value=0, max_value=200, value=80)
 
-
-# Make dataframe for prediction
-# Create a dictionary with the raw input data
+# Build input dataframe
 input_dict_raw = {
     'AGE': [age],
     'GENDER': [gender],
@@ -43,55 +46,42 @@ input_dict_raw = {
     'HEIGHT(cm)': [height],
     'BMI': [bmi],
     'WAIST CIRCUMFERENCE': [waist],
-    'BP(mmHg)': [f'{systolic_bp}/{diastolic_bp}'], # Reconstruct BP string
+    'BP(mmHg)': [f'{systolic_bp}/{diastolic_bp}'],  # reconstruct BP string
     'BLOOD SUGAR(mmol/L)': [blood_sugar],
     'HTN': [htn]
 }
-
-# Convert to DataFrame
 input_df_raw = pd.DataFrame(input_dict_raw)
 
-# Apply the same preprocessing steps as the training data
-
-# Split the 'BP(mmHg)' column
+# Preprocessing
 bp_split = input_df_raw['BP(mmHg)'].str.split('/', expand=True)
 input_df_raw['SYSTOLIC BP'] = pd.to_numeric(bp_split[0], errors='coerce')
 input_df_raw['DIASTOLIC BP'] = pd.to_numeric(bp_split[1], errors='coerce')
-
-# Drop the original 'BP(mmHg)' column
 input_df_processed = input_df_raw.drop('BP(mmHg)', axis=1)
 
-# Handle categorical variables using one-hot encoding
+# One-hot encoding for categorical features
 input_df_processed = pd.get_dummies(input_df_processed, columns=['GENDER', 'VISIT TYPE'], drop_first=True)
 
-# Ensure all columns from training data are present, adding missing ones with default (0)
-# and reorder columns to match training data (X_train)
-# You might want to save X_train.columns during training for a robust solution
-X_train_cols = ['AGE', 'WEIGHT(kg)', 'HEIGHT(cm)', 'BMI', 'WAIST CIRCUMFERENCE',
-       'BLOOD SUGAR(mmol/L)', 'HTN', 'SYSTOLIC BP', 'DIASTOLIC BP', 'GENDER_M',
-       'VISIT TYPE_R']
-
-
+# Align columns with training data
+X_train_cols = [
+    'AGE', 'WEIGHT(kg)', 'HEIGHT(cm)', 'BMI', 'WAIST CIRCUMFERENCE',
+    'BLOOD SUGAR(mmol/L)', 'HTN', 'SYSTOLIC BP', 'DIASTOLIC BP',
+    'GENDER_M', 'VISIT TYPE_R'
+]
 for col in X_train_cols:
     if col not in input_df_processed.columns:
         input_df_processed[col] = 0
-
 input_df_aligned = input_df_processed[X_train_cols]
 
-
-# Predict button
+# Predict
 if st.button("Predict"):
     try:
         pred = model.predict(input_df_aligned)[0]
         prob = model.predict_proba(input_df_aligned)[0][1]
 
         st.subheader("🔍 Prediction Result")
-        # Mapping outcome to label
-        outcome_mapping = {
-            0: "Non-Diabetic",
-            1: "Diabetic"
-        }
+        outcome_mapping = {0: "Non-Diabetic", 1: "Diabetic"}
         st.write("**Outcome:**", outcome_mapping.get(pred, "Unknown"))
         st.write("**Probability of Diabetes:**", f"{prob:.3f}")
     except Exception as e:
-        st.error(f"Error during prediction: {e}")
+        st.error(f"⚠️ Error during prediction: {e}")
+
