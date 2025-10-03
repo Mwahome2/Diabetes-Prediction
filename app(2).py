@@ -6,9 +6,9 @@ import os
 # Load trained Random Forest model safely
 @st.cache_resource
 def load_model():
-    model_path = "RandomForest_model.pkl"
+    model_path = "RandomForest_model.pkl"   # adjust if inside a folder
     if not os.path.exists(model_path):
-        st.error(f"❌ Model file not found: {model_path}. Please ensure it is uploaded.")
+        st.error(f"❌ Model file not found at: {model_path}. Please check your repo structure.")
         st.stop()
     return joblib.load(model_path)
 
@@ -20,7 +20,7 @@ st.title("🌿 Diabetes Prediction App (Random Forest)")
 
 st.write("This app uses your trained Random Forest model to predict diabetes based on patient details.")
 
-# Input form - Updated to match training data features
+# Input form
 col1, col2, col3 = st.columns(3)
 with col1:
     age = st.number_input("AGE", min_value=1, max_value=120, value=30)
@@ -46,7 +46,7 @@ input_dict_raw = {
     'HEIGHT(cm)': [height],
     'BMI': [bmi],
     'WAIST CIRCUMFERENCE': [waist],
-    'BP(mmHg)': [f'{systolic_bp}/{diastolic_bp}'],  # reconstruct BP string
+    'BP(mmHg)': [f'{systolic_bp}/{diastolic_bp}'],
     'BLOOD SUGAR(mmol/L)': [blood_sugar],
     'HTN': [htn]
 }
@@ -57,8 +57,6 @@ bp_split = input_df_raw['BP(mmHg)'].str.split('/', expand=True)
 input_df_raw['SYSTOLIC BP'] = pd.to_numeric(bp_split[0], errors='coerce')
 input_df_raw['DIASTOLIC BP'] = pd.to_numeric(bp_split[1], errors='coerce')
 input_df_processed = input_df_raw.drop('BP(mmHg)', axis=1)
-
-# One-hot encoding for categorical features
 input_df_processed = pd.get_dummies(input_df_processed, columns=['GENDER', 'VISIT TYPE'], drop_first=True)
 
 # Align columns with training data
@@ -84,4 +82,5 @@ if st.button("Predict"):
         st.write("**Probability of Diabetes:**", f"{prob:.3f}")
     except Exception as e:
         st.error(f"⚠️ Error during prediction: {e}")
+
 
